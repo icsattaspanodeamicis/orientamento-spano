@@ -531,10 +531,23 @@ function avvia(CONFIG) {
           carica();
         }
       }).catch(function () {
-        err.textContent = FAIL;
-        err.hidden = false;
-        ok.disabled = false;
-        ok.textContent = "Prenota il turno";
+        // La risposta non è arrivata: la prenotazione potrebbe essere già registrata. Si controlla prima di segnalare l'errore.
+        ok.textContent = "Verifico la prenotazione…";
+        var email = f.email.input.value;
+        var tenta = function (n) {
+          return call("verificaPrenotazione", email).catch(function () {
+            if (n > 0) return new Promise(function (r) { setTimeout(r, 3000); }).then(function () { return tenta(n - 1); });
+            return null;
+          });
+        };
+        tenta(2).then(function (res) {
+          if (res && res.ok) { showDone(res); carica(); return; }
+          err.textContent = FAIL + " Se non ricevi l'email di conferma entro qualche minuto, riprova.";
+          err.hidden = false;
+          ok.disabled = false;
+          ok.textContent = "Prenota il turno";
+          carica();
+        });
       });
     });
 
@@ -565,7 +578,9 @@ function avvia(CONFIG) {
       li.append(el("span", "o", p.ora), el("span", "c", "classe " + p.classe));
       prog.append(li);
     });
-    var msg = res.emailInviata
+    var msg = res.recuperata
+      ? "La prenotazione risulta registrata. Riceverai a " + r.email + " l'email di conferma con il link per annullare: se non la trovi, controlla anche lo spam."
+      : res.emailInviata
       ? "Ti abbiamo scritto a " + r.email + " con questi dati e il link per annullare, se non potrai partecipare."
       : "La prenotazione è registrata, ma non siamo riusciti a inviarti l'email di conferma. Annota il codice e conserva questa schermata.";
     var close = el("button", "btn primary", "Chiudi");
