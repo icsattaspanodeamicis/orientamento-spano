@@ -292,6 +292,8 @@ h1 { font-size:clamp(2rem,4vw,3rem); line-height:1.13; letter-spacing:-.035em; }
 // Indirizzo /exec dell'app. Vuoto quando la pagina è servita da Apps Script.
 var API_URL = "https://script.google.com/macros/s/AKfycbwjCHvauuad29uRDKQk6BPPqO2cVmRJ1ioVd5Hjx864D7TiODxusZ1w5hcxjh1g2oLv/exec";
 var CONFIG_SERVER = null;
+// Impostazioni scritte nella pagina esterna: evitano una richiesta in più all'avvio.
+var CONFIG_STATICA = {"istituto": "I.C. Satta Spano De Amicis - Plesso Spano", "anno": "2026/2027", "classi": ["3A", "3B", "3C"], "minuti": 30, "indirizzo": "Via Falzarego 28, Cagliari", "mappa": "https://www.google.com/maps/search/?api=1&query=Scuola%20Spano%2C%20Via%20Falzarego%2028%2C%20Cagliari", "annulla": null};
 
 function avvia(CONFIG) {
   var NOMI_GIORNO = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
@@ -337,8 +339,11 @@ function avvia(CONFIG) {
   function render() {
     els.days.replaceChildren();
     els.days.setAttribute("aria-busy", String(state === "loading"));
-    els.note.hidden = state !== "error";
-    if (state === "error") els.note.textContent = "Non riesco a caricare i turni. Ricarica la pagina tra qualche istante.";
+    els.note.hidden = state === "ready";
+    els.note.classList.toggle("error", state === "error");
+    els.note.textContent = state === "error"
+      ? "Non riesco a caricare i turni. Ricarica la pagina tra qualche istante."
+      : "Caricamento dei turni disponibili in corso…";
     var giorni = state === "ready" ? data.giorni : [1, 2, 3].map(function () { return null; });
     giorni.forEach(function (g) {
       var day = el("section", "day");
@@ -662,11 +667,16 @@ function api(fn, args) {
   });
 }
 
+var tokenAnnulla = "";
+try { tokenAnnulla = new URLSearchParams(location.search).get("annulla") || ""; } catch (e) {}
 if (CONFIG_SERVER) {
   avvia(CONFIG_SERVER);
+} else if (CONFIG_STATICA && !tokenAnnulla) {
+  avvia(CONFIG_STATICA);
 } else {
-  var tokenAnnulla = "";
-  try { tokenAnnulla = new URLSearchParams(location.search).get("annulla") || ""; } catch (e) {}
+  var n0 = document.getElementById("note");
+  n0.textContent = "Caricamento in corso…";
+  n0.hidden = false;
   api("config", [tokenAnnulla]).then(avvia).catch(function () {
     var n = document.getElementById("note");
     n.textContent = "Non riesco a caricare la pagina. Ricarica tra qualche istante.";
